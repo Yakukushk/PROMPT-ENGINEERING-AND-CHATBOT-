@@ -9,6 +9,8 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @Service
 public class ChatService {
   private final OllamaChatModel ollamaChatModel;
@@ -21,7 +23,7 @@ public class ChatService {
     this.docReaderService = docReaderService;
   }
 
-  public void uploadFile(MultipartFile file) {
+  public void uploadFile(List<MultipartFile> file) {
     docReaderService.splitFile(file);
   }
 
