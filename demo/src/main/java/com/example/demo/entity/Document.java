@@ -1,5 +1,6 @@
 package com.example.demo.entity;
 
+import com.example.demo.entity.enums.DocumentStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,10 +24,31 @@ public class Document {
   @Column(name = "filename", nullable = false, length = 255)
   private String fileName;
 
-  @Column(name = "course_code", nullable = false, length = 50)
-  private String courseCode;
+  @Column(name = "content_type", nullable = false, length = 50)
+  private String contentType;
 
-  @Column(name = "updated_at")
+  @Column(name = "size", nullable = false)
+  private Long size;
+
+  @Column(name = "status", nullable = false)
+  @Enumerated(EnumType.STRING)
+  private DocumentStatus status;
+
+  @Column(name = "indexed")
+  private boolean indexed = false;
+
+  @Column(name = "error_message", length = 1000)
+  private String errorMessage;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(
+          name = "conversation_id",
+          nullable = false,
+          foreignKey = @ForeignKey(name = "fk_document_conversation")
+  )
+  private Conversation conversation;
+
+  @Column(name = "created_at", nullable = false)
   private LocalDateTime createdAt;
 
   @PrePersist

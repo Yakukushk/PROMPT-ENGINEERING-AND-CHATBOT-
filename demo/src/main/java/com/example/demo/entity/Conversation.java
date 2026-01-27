@@ -1,11 +1,14 @@
 package com.example.demo.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @AllArgsConstructor
@@ -35,6 +38,12 @@ public class Conversation {
 
   @Column(name = "message_count")
   private Integer messageCount = 0;
+
+  @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<Message> messages = new ArrayList<>();
+
+  @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<Document> documents = new ArrayList<>();
 
   @PrePersist
   protected void onCreate() {

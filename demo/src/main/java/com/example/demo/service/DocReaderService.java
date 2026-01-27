@@ -1,7 +1,12 @@
-package com.example.demo.services;
+package com.example.demo.service;
 
 
+import com.example.demo.dto.DocumentDto;
+import com.example.demo.dto.request.DocumentRequest;
+import com.example.demo.entity.enums.DocumentStatus;
 import com.example.demo.exception.DocReaderServiceException;
+import com.example.demo.service.interfaces.DocumentService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.transformer.splitter.TextSplitter;
@@ -21,6 +26,7 @@ import java.util.Map;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class DocReaderService {
 
   @Value("classpath:/pdf/spring-boot-reference.pdf")
@@ -28,6 +34,8 @@ public class DocReaderService {
 
   private final VectorStore vectorStore;
   private final UploadFileService uploadFileService;
+  private final DocumentService  documentService;
+
   TextSplitter splitter = new TokenTextSplitter(
           500,    // chunkSize
           100,    // minCharSizeChunk
@@ -36,21 +44,24 @@ public class DocReaderService {
           true    // keepSeparator
   );
 
-  public DocReaderService(VectorStore vectorStore,
-                          UploadFileService uploadFileService) {
-    this.vectorStore = vectorStore;
-    this.uploadFileService = uploadFileService;
-  }
-
-  public void splitFile(List<MultipartFile> files) {
+  public void splitFile(List<MultipartFile> files, Long conversationId) {
     for (MultipartFile file : files) {
+
+      DocumentDto documentDto = documentService.save(DocumentRequest.builder()
+              .conversationId(conversationId)
+              .filename(file.getOriginalFilename())
+              .contentType(file.getContentType())
+              .size(file.getSize())
+              .status(DocumentStatus.UPLOADED)
+              .build());
+
       try {
         Resource uploadedResource = uploadFileService.toResource(file);
         if (uploadedResource == null) {
           log.error("Failed to process file: {}", file.getName());
           continue;
         }
-        List<Document> documentList = getDocuments(file, uploadedResource);
+        List<Document> documentList = getDocuments(file, uploadedResource, conversationId);
 
         List<Document> chunks = splitter.split(documentList);
         int batchSize = 20;
@@ -59,22 +70,26 @@ public class DocReaderService {
           List<Document> batch = chunks.subList(i, end);
           vectorStore.accept(batch);
         }
+        documentService.markIndexed(documentDto.getId());
       } catch (Exception e) {
+        documentService.markFailed(documentDto.getId(), documentDto.getErrorMessage());
         throw new DocReaderServiceException("Failed to index file {}", file.getOriginalFilename(), e);
       }
     }
   }
 
-  private static List<Document> getDocuments(MultipartFile file, Resource uploadedResource) {
+  private static List<Document> getDocuments(MultipartFile file, Resource uploadedResource, Long conversationId) {
     TikaDocumentReader tikaDocumentReader = new TikaDocumentReader(uploadedResource);
 
     List<Document> documentList = tikaDocumentReader.read();
     String fileName = file.getOriginalFilename();
+    String fileContent = file.getContentType();
 
     documentList.forEach(doc -> {
       Map<String, Object> metadata = new HashMap<>();
+      metadata.put("conversationId", conversationId);
       metadata.put("filename", fileName);
-      metadata.put("source", "uploaded_file");
+      metadata.put("contentType", fileContent);
       metadata.put("upload_time", LocalDateTime.now().toString());
       doc.getMetadata().putAll(metadata);
     });

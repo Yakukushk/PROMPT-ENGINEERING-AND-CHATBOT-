@@ -2,22 +2,22 @@ package com.example.demo.service;
 
 import com.example.demo.dto.MessageDto;
 import com.example.demo.dto.request.MessageRequest;
+import com.example.demo.dto.request.update.UpdateMessageRequest;
 import com.example.demo.entity.Conversation;
 import com.example.demo.entity.Message;
 import com.example.demo.exception.ResourceNotFoundException;
-import com.example.demo.mapper.MessageMapper;
 import com.example.demo.repository.ConversationRepository;
 import com.example.demo.repository.MessageRepository;
 import com.example.demo.service.interfaces.MessageService;
-import org.springframework.transaction.annotation.Transactional;
+import com.example.demo.service.mapper.MessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -34,7 +34,7 @@ public class MessageServiceImpl implements MessageService {
     log.debug("Finding all messages");
     return messageRepository.findAll().stream()
             .map(messageMapper::toDto)
-            .collect(Collectors.toList());
+            .toList();
   }
 
   @Override
@@ -47,7 +47,7 @@ public class MessageServiceImpl implements MessageService {
   public List<MessageDto> findAllById(Iterable<Long> ids) {
     return messageRepository.findAllById(ids).stream()
             .map(messageMapper::toDto)
-            .collect(Collectors.toList());
+            .toList();
   }
 
   @Override
@@ -63,6 +63,7 @@ public class MessageServiceImpl implements MessageService {
             .conversation(conversation)
             .content(request.getContent())
             .createdAt(LocalDateTime.now())
+            .role(request.getRole())
             .build();
     Message savedMessage = messageRepository.save(message);
 
@@ -74,7 +75,7 @@ public class MessageServiceImpl implements MessageService {
   }
 
   @Override
-  public MessageDto update(Long id, MessageRequest request) {
+  public MessageDto update(Long id, UpdateMessageRequest request) {
     if (request == null) {
       throw new IllegalArgumentException("Message request cannot be null");
     }

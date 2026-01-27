@@ -1,14 +1,19 @@
 package com.example.demo.service;
 
+import com.example.demo.dto.ConversationDto;
 import com.example.demo.dto.request.ConversationRequest;
+import com.example.demo.dto.request.update.UpdateConversationRequest;
 import com.example.demo.entity.Conversation;
+import com.example.demo.entity.Document;
 import com.example.demo.entity.Message;
 import com.example.demo.entity.User;
 import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.repository.ConversationRepository;
+import com.example.demo.repository.DocumentRepository;
 import com.example.demo.repository.MessageRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.service.interfaces.ConversationService;
+import com.example.demo.service.mapper.ConversationMapper;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,25 +30,32 @@ public class ConversationServiceImpl implements ConversationService {
   private final ConversationRepository conversationRepository;
   private final UserRepository userRepository;
   private final MessageRepository messageRepository;
+  private final ConversationMapper conversationMapper;
+  private final DocumentRepository documentRepository;
 
   @Override
-  public List<Conversation> findAll() {
-    return conversationRepository.findAll();
+  public List<ConversationDto> findAll() {
+    return conversationRepository.findAll().stream()
+            .map(conversationMapper::toDto)
+            .toList();
   }
 
   @Override
-  public Optional<Conversation> findById(Long id) {
-    return conversationRepository.findById(id);
+  public Optional<ConversationDto> findById(Long id) {
+    return conversationRepository.findById(id)
+            .map(conversationMapper::toDto);
   }
 
   @Override
-  public List<Conversation> findAllById(Iterable<Long> ids) {
-    return conversationRepository.findAllById(ids);
+  public List<ConversationDto> findAllById(Iterable<Long> ids) {
+    return conversationRepository.findAllById(ids)
+            .stream().map(conversationMapper::toDto)
+            .toList();
   }
 
   @Override
   @Transactional
-  public Conversation save(ConversationRequest request) {
+  public ConversationDto save(ConversationRequest request) {
 
     if (request == null) {
       throw new IllegalArgumentException("Conversation request cannot be null");
@@ -57,17 +69,18 @@ public class ConversationServiceImpl implements ConversationService {
             .title(request.getTitle())
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
-            .messageCount(request.getInitialMessageCount() != null ?
-                    request.getInitialMessageCount() : 0)
+            .messageCount(0)
             .build();
 
-    return conversationRepository.save(conversation);
+    Conversation saveConversation = conversationRepository.save(conversation);
+    return conversationMapper.toDto(saveConversation);
   }
 
   @Override
   @Transactional
-  public Conversation update(Long id, ConversationRequest request) {
-    Conversation conversation = findById(id)
+  public ConversationDto update(Long id, UpdateConversationRequest request) {
+
+    Conversation conversation = conversationRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Conversation", "id", id));
 
     User user = userRepository.findById(request.getUserId())
@@ -81,34 +94,28 @@ public class ConversationServiceImpl implements ConversationService {
       conversation.setMessageCount(request.getInitialMessageCount());
     }
 
-    return conversationRepository.save(conversation);
+    Conversation updated = conversationRepository.save(conversation);
+    return conversationMapper.toDto(updated);
   }
 
   @Override
   @Transactional
   public void delete(Long conversationId) {
-    List<Message> messages = messageRepository.findByConversationId(conversationId);
-    if (!messages.isEmpty()) {
-      messageRepository.deleteAll(messages);
+    log.debug("Deleting conversation with id: {}", conversationId);
 
-      Conversation conversation = conversationRepository.findById(conversationId)
-              .orElseThrow(() -> new ResourceNotFoundException("Conversation", "id", conversationId));
+    Conversation conversation = conversationRepository.findById(conversationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Conversation", "id", conversationId));
+    
+    conversationRepository.delete(conversation);
 
-      conversationRepository.delete(conversation);
-      conversationRepository.save(conversation);
-    }
+    log.info("Conversation and all related messages/documents deleted with id: {}", conversationId);
   }
 
   @Override
-  @Transactional
-  public Conversation addMessageCount(Long conversationId) {
-    Conversation conversation = conversationRepository.findById(conversationId)
-            .orElseThrow(() -> new ResourceNotFoundException("Conversation", "id", conversationId));
-
-    conversation.setMessageCount(conversation.getMessageCount() + 1);
-    conversation.setUpdatedAt(LocalDateTime.now());
-
-    return conversationRepository.save(conversation);
+  public List<ConversationDto> findConversationByUsername(String username) {
+    User user = userRepository.findByUsername(username);
+    return conversationRepository.findConversationByUser(user)
+            .stream().map(conversationMapper::toDto).toList();
   }
 
   @Transactional
