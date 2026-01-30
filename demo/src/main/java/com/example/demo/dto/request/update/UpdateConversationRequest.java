@@ -16,4 +16,5 @@ public class UpdateConversationRequest {
   @Schema(description = "conversation title")
   private String title;
   private Integer initialMessageCount;
+  private Long systemPromptId;
 }

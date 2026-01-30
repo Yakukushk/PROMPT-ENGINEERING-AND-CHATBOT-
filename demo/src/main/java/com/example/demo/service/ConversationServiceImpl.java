@@ -4,20 +4,17 @@ import com.example.demo.dto.ConversationDto;
 import com.example.demo.dto.request.ConversationRequest;
 import com.example.demo.dto.request.update.UpdateConversationRequest;
 import com.example.demo.entity.Conversation;
-import com.example.demo.entity.Document;
-import com.example.demo.entity.Message;
+import com.example.demo.entity.SystemPrompt;
 import com.example.demo.entity.User;
 import com.example.demo.exception.ResourceNotFoundException;
-import com.example.demo.repository.ConversationRepository;
-import com.example.demo.repository.DocumentRepository;
-import com.example.demo.repository.MessageRepository;
-import com.example.demo.repository.UserRepository;
+import com.example.demo.repository.*;
 import com.example.demo.service.interfaces.ConversationService;
 import com.example.demo.service.mapper.ConversationMapper;
-import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -32,7 +29,9 @@ public class ConversationServiceImpl implements ConversationService {
   private final MessageRepository messageRepository;
   private final ConversationMapper conversationMapper;
   private final DocumentRepository documentRepository;
+  private final SystemPromptRepository systemPromptRepository;
 
+  public static final String UNIVERSITY_RAG = "UNIVERSITY_RAG";
   @Override
   public List<ConversationDto> findAll() {
     return conversationRepository.findAll().stream()
@@ -64,11 +63,26 @@ public class ConversationServiceImpl implements ConversationService {
     User user = userRepository.findById(request.getUserId())
             .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getUserId()));
 
+    SystemPrompt systemPrompt;
+
+    if (request.getSystemPromptId() != null) {
+      systemPrompt = systemPromptRepository.findById(request.getSystemPromptId())
+              .orElseThrow(() ->
+                      new ResourceNotFoundException("SystemPrompt", "id", request.getSystemPromptId())
+              );
+    } else {
+      systemPrompt = systemPromptRepository.findByCode(UNIVERSITY_RAG)
+              .orElseThrow(() ->
+                      new IllegalStateException("Default system prompt UNIVERSITY_RAG not found")
+              );
+    }
+
     Conversation conversation = Conversation.builder()
             .user(user)
             .title(request.getTitle())
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
+            .systemPrompt(systemPrompt)
             .messageCount(0)
             .build();
 
@@ -92,6 +106,14 @@ public class ConversationServiceImpl implements ConversationService {
 
     if (request.getInitialMessageCount() != null) {
       conversation.setMessageCount(request.getInitialMessageCount());
+    }
+
+    if (request.getSystemPromptId() != null) {
+      SystemPrompt systemPrompt = systemPromptRepository.findById(request.getSystemPromptId())
+              .orElseThrow(() ->
+                      new ResourceNotFoundException("SystemPrompt", "id", request.getSystemPromptId())
+              );
+      conversation.setSystemPrompt(systemPrompt);
     }
 
     Conversation updated = conversationRepository.save(conversation);

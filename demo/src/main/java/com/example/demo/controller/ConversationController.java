@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.ConversationDto;
 import com.example.demo.dto.request.ConversationRequest;
+import com.example.demo.dto.request.update.UpdateConversationRequest;
 import com.example.demo.service.interfaces.ConversationService;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,17 @@ public class ConversationController {
   )
   public ResponseEntity<ConversationDto> createConversation(@RequestBody ConversationRequest request) {
     return ResponseEntity.ok(conversationService.save(request));
+  }
+
+  @PutMapping("/{conversationId}")
+  @Operation(
+          summary = "Update Conversation"
+  )
+  public ResponseEntity<ConversationDto> updateConversation(
+          @PathVariable Long conversationId,
+          @RequestBody UpdateConversationRequest request
+  ) {
+    return ResponseEntity.ok(conversationService.update(conversationId, request));
   }
 
   @DeleteMapping("/{conversationId}")

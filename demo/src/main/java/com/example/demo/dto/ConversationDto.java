@@ -20,4 +20,5 @@ public class ConversationDto {
   private Integer messageCount;
   private List<MessageDto> messages;
   private List<DocumentDto> documents;
+  private Long systemPromptId;
 }

@@ -5,4 +5,8 @@ import com.example.demo.dto.request.MessageRequest;
 import com.example.demo.dto.request.update.UpdateMessageRequest;
 import com.example.demo.service.interfaces.base.CrudService;
 
-public interface MessageService extends CrudService<MessageDto, Long, MessageRequest, UpdateMessageRequest> { }
+import java.util.List;
+
+public interface MessageService extends CrudService<MessageDto, Long, MessageRequest, UpdateMessageRequest> {
+  List<MessageDto> findByConversationId(Long conversationId);
+}

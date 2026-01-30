@@ -37,10 +37,10 @@ public class DocReaderService {
   private final DocumentService  documentService;
 
   TextSplitter splitter = new TokenTextSplitter(
-          500,    // chunkSize
-          100,    // minCharSizeChunk
-          200,      // minChunkLengthToEmbed
-          10000,  // maxNumChunks
+          250,    // chunkSize
+          50,    // minCharSizeChunk
+          100,      // minChunkLengthToEmbed
+          5000,  // maxNumChunks
           true    // keepSeparator
   );
 

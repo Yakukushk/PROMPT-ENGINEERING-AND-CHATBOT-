@@ -39,6 +39,10 @@ public class Conversation {
   @Column(name = "message_count")
   private Integer messageCount = 0;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "system_prompt_id")
+  private SystemPrompt systemPrompt;
+
   @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<Message> messages = new ArrayList<>();
 

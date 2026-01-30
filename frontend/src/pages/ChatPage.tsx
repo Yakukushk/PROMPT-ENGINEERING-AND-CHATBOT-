@@ -1,15 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Plus, MessageCircle, Trash2 } from 'lucide-react';
-import { conversationAPI, documentAPI, userAPI } from '../services/api';
+import { conversationAPI, documentAPI, systemPromptAPI, userAPI } from '../services/api';
 import { authService } from '../services/auth';
 import { ChatInterface } from '../components/ChatInterface';
-import type { Conversation } from '../types';
+import type { Conversation, SystemPrompt } from '../types';
 
 export const ChatPage = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
   const [uploadStatus, setUploadStatus] = useState<Record<number, boolean>>({});
+  const [systemPrompts, setSystemPrompts] = useState<SystemPrompt[]>([]);
+  const [promptsLoading, setPromptsLoading] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
+  const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
   const user = authService.getUser();
   const [currentUserId, setCurrentUserId] = useState<number | null>(
     user?.userId ?? user?.id ?? null
@@ -18,6 +22,19 @@ export const ChatPage = () => {
   const navigate = useNavigate();
   const getConversationId = (conversation: Conversation) =>
     conversation.conversationId ?? conversation.id ?? null;
+  const currentConversation = useMemo(() => {
+    return conversations.find(
+      (conversation) => getConversationId(conversation) === currentConversationId
+    );
+  }, [conversations, currentConversationId]);
+
+  const defaultPromptId = useMemo(() => {
+    const byCode = systemPrompts.find((prompt) => prompt.code === 'UNIVERSITY_RAG')?.id;
+    if (byCode != null) return byCode;
+    const systemPrompt = systemPrompts.find((prompt) => prompt.system)?.id;
+    if (systemPrompt != null) return systemPrompt;
+    return systemPrompts[0]?.id ?? null;
+  }, [systemPrompts]);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -50,6 +67,24 @@ export const ChatPage = () => {
     loadConversations();
   }, [loadConversations]);
 
+  const loadSystemPrompts = useCallback(async () => {
+    setPromptsLoading(true);
+    setPromptError(null);
+    try {
+      const prompts = await systemPromptAPI.getAll();
+      setSystemPrompts(prompts);
+    } catch (error) {
+      console.error('Failed to load system prompts:', error);
+      setPromptError('Failed to load system prompts');
+    } finally {
+      setPromptsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSystemPrompts();
+  }, [loadSystemPrompts]);
+
   const ensureUserId = useCallback(async () => {
     if (currentUserId != null) return currentUserId;
     try {
@@ -70,7 +105,19 @@ export const ChatPage = () => {
     }
   }, [currentUserId]);
 
-  const createNewConversation = async () => {
+  useEffect(() => {
+    if (!currentConversation) {
+      setSelectedPromptId(defaultPromptId);
+      return;
+    }
+    if (currentConversation.systemPromptId != null) {
+      setSelectedPromptId(currentConversation.systemPromptId);
+      return;
+    }
+    setSelectedPromptId(defaultPromptId);
+  }, [currentConversation, defaultPromptId]);
+
+  const createNewConversation = useCallback(async () => {
     try {
       const userId = await ensureUserId();
       if (userId == null) {
@@ -81,6 +128,7 @@ export const ChatPage = () => {
         userId,
         title: `Conversation ${new Date().toLocaleString()}`,
         initialMessageCount: 0,
+        systemPromptId: selectedPromptId ?? defaultPromptId ?? undefined,
       });
       setConversations((prev) => [newConversation, ...prev]);
       const newConversationId = getConversationId(newConversation);
@@ -96,6 +144,66 @@ export const ChatPage = () => {
     } catch (error) {
       console.error('Failed to create conversation:', error);
     }
+  }, [defaultPromptId, ensureUserId, selectedPromptId]);
+
+  const updateConversationPrompt = async (promptId: number | null) => {
+    if (!currentConversation || currentConversationId == null || promptId == null) {
+      setSelectedPromptId(promptId);
+      return;
+    }
+    const previousPromptId = selectedPromptId;
+    setSelectedPromptId(promptId);
+    try {
+      const userId = currentConversation.userId ?? (await ensureUserId());
+      if (userId == null) {
+        throw new Error('User ID is not available');
+      }
+      const updated = await conversationAPI.update(currentConversationId, {
+        userId,
+        title: currentConversation.title,
+        initialMessageCount: currentConversation.messageCount,
+        systemPromptId: promptId,
+      });
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          getConversationId(conversation) === currentConversationId
+            ? { ...conversation, ...updated }
+            : conversation
+        )
+      );
+    } catch (error) {
+      console.error('Failed to update conversation prompt:', error);
+      setSelectedPromptId(previousPromptId ?? null);
+    }
+  };
+
+  const handleCreatePrompt = async (data: {
+    name: string;
+    template: string;
+  }): Promise<SystemPrompt | null> => {
+    const userId = await ensureUserId();
+    if (userId == null) {
+      console.error('User ID is not available');
+      return null;
+    }
+    const created = await systemPromptAPI.create({
+      name: data.name,
+      template: data.template,
+      version: 1,
+      userId,
+    });
+    setSystemPrompts((prev) => [created, ...prev]);
+    setSelectedPromptId(created.id);
+    await updateConversationPrompt(created.id);
+    return created;
+  };
+
+  const handleDeletePrompt = async (promptId: number) => {
+    if (selectedPromptId === promptId && defaultPromptId != null) {
+      await updateConversationPrompt(defaultPromptId);
+    }
+    await systemPromptAPI.remove(promptId);
+    setSystemPrompts((prev) => prev.filter((prompt) => prompt.id !== promptId));
   };
 
   const deleteConversation = async (conversationId: number | null) => {
@@ -160,19 +268,6 @@ export const ChatPage = () => {
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If no conversation exists, create one automatically
-  if (conversations.length === 0 && currentConversationId === null) {
-    createNewConversation();
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Creating your first conversation...</p>
         </div>
       </div>
     );
@@ -263,6 +358,13 @@ export const ChatPage = () => {
               canChat={uploadStatus[currentConversationId] ?? true}
               onUploadSuccess={handleUploadSuccess}
               onDeleteDocument={deleteDocument}
+              systemPrompts={systemPrompts}
+              selectedPromptId={selectedPromptId}
+              promptsLoading={promptsLoading}
+              promptError={promptError}
+              onSelectPrompt={updateConversationPrompt}
+              onCreatePrompt={handleCreatePrompt}
+              onDeletePrompt={handleDeletePrompt}
               documents={
                 conversations.find(
                   (conversation) => getConversationId(conversation) === currentConversationId

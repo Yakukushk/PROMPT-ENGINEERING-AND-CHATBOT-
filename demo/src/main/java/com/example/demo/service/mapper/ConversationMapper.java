@@ -27,6 +27,11 @@ public class ConversationMapper {
             .messageCount(conversation.getMessageCount())
             .createdAt(conversation.getCreatedAt())
             .updatedAt(conversation.getUpdatedAt())
+            .systemPromptId(
+                    conversation.getSystemPrompt() != null
+                            ? conversation.getSystemPrompt().getId()
+                            : null
+            )
             .documents(documentMapper.toDtoList(conversation.getDocuments()))
             .messages(messageMapper.toDtoList(conversation.getMessages()))
             .build();

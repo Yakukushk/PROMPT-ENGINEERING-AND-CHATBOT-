@@ -51,6 +51,13 @@ public class MessageServiceImpl implements MessageService {
   }
 
   @Override
+  public List<MessageDto> findByConversationId(Long conversationId) {
+    return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId).stream()
+            .map(messageMapper::toDto)
+            .toList();
+  }
+
+  @Override
   @Transactional
   public MessageDto save(MessageRequest request) {
     if (request == null) {

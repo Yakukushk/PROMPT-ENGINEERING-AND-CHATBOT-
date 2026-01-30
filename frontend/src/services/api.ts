@@ -1,5 +1,15 @@
 import axios, { AxiosHeaders } from 'axios';
-import type { User, Conversation, ChatRequest, ChatResponse, ConversationRequest } from '../types';
+import type {
+  User,
+  Conversation,
+  ChatRequest,
+  ChatResponse,
+  ConversationRequest,
+  ConversationUpdateRequest,
+  Message,
+  SystemPrompt,
+  SystemPromptRequest,
+} from '../types';
 
 const API_BASE_URL = '/api/v1';
 
@@ -81,6 +91,14 @@ export const conversationAPI = {
     return response.data;
   },
 
+  update: async (
+    conversationId: number,
+    request: ConversationUpdateRequest
+  ): Promise<Conversation> => {
+    const response = await api.put(`/conversation/${conversationId}`, request);
+    return response.data;
+  },
+
   remove: async (conversationId: number): Promise<void> => {
     await api.delete(`/conversation/${conversationId}`);
   },
@@ -89,6 +107,13 @@ export const conversationAPI = {
 export const documentAPI = {
   remove: async (documentId: number): Promise<void> => {
     await api.delete(`/document/${documentId}`);
+  },
+};
+
+export const messageAPI = {
+  getByConversationId: async (conversationId: number): Promise<Message[]> => {
+    const response = await api.get(`/conversation/${conversationId}/messages`);
+    return response.data;
   },
 };
 
@@ -108,6 +133,22 @@ export const chatAPI = {
         'Content-Type': 'multipart/form-data',
       },
     });
+  },
+};
+
+export const systemPromptAPI = {
+  getAll: async (): Promise<SystemPrompt[]> => {
+    const response = await api.get('/system-prompt');
+    return response.data;
+  },
+
+  create: async (request: SystemPromptRequest): Promise<SystemPrompt> => {
+    const response = await api.post('/system-prompt', request);
+    return response.data;
+  },
+
+  remove: async (promptId: number): Promise<void> => {
+    await api.delete(`/system-prompt/${promptId}`);
   },
 };
 

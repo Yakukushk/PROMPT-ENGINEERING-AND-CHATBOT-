@@ -14,6 +14,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
   Page<Message> findByConversationId(Long conversationId, Pageable pageable);
 
+  List<Message> findByConversationIdOrderByCreatedAtAsc(Long conversationId);
+
   @Query("SELECT m FROM Message m WHERE m.conversation.id = :conversationId ORDER BY m.createdAt DESC LIMIT :limit")
   List<Message> findTopByConversationIdOrderByCreatedAtDesc(
           @Param("conversationId") Long conversationId,
