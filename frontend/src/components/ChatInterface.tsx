@@ -298,7 +298,7 @@ export const ChatInterface = ({
         </div>
 
         {settingsExpanded && (
-          <div className="p-4 space-y-4">
+          <div className="p-4 space-y-4 max-h-[40vh] overflow-y-auto">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
